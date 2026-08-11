@@ -1,0 +1,3 @@
+[tasks.clean]
+description = "Clean project artifacts"
+depends = ["go:test:clean"]

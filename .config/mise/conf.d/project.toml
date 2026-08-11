@@ -1,0 +1,32 @@
+[tasks.tidy]
+description = "Tidy Go module files"
+depends = ["go:mod:tidy"]
+
+[tasks."tidy:check"]
+description = "Check that Go module files are tidy"
+depends = ["go:mod:lint"]
+
+[tasks.fmt]
+description = "Format project source code"
+depends = ["go:fmt:fix"]
+
+[tasks."fmt:check"]
+description = "Check project source formatting"
+depends = ["go:fmt:check"]
+
+[tasks.lint]
+description = "Run linters"
+depends = ["go:lint"]
+
+[tasks."lint:fix"]
+description = "Run linters and apply automatic fixes"
+depends = ["go:lint:fix"]
+
+[tasks.test]
+description = "Run tests"
+depends = ["go:test"]
+
+[tasks."pre-commit"]
+description = "Run the full local development gate"
+alias = "prk"
+depends = ["tidy:check", "fmt:check", "lint", "test"]

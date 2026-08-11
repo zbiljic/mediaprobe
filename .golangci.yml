@@ -1,0 +1,17 @@
+version: "2"
+
+linters:
+  enable:
+    - gocritic
+    - gocyclo
+    - godox
+    - makezero
+    - misspell
+    - unconvert
+
+formatters:
+  enable:
+    - gofumpt
+  settings:
+    gofumpt:
+      extra-rules: true

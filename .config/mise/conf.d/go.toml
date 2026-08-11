@@ -1,0 +1,58 @@
+[env]
+_.source = { path = ".config/mise/scripts/go-mod-env.sh", tools = true }
+
+[tasks."go:mod:tidy"]
+description = "Tidy Go module files"
+run = "go mod tidy -compat=$GO_MOD_COMPAT"
+
+[tasks."go:mod:lint"]
+description = "Check that Go module files are tidy"
+run = "go mod tidy -diff -compat=$GO_MOD_COMPAT"
+
+[tasks."go:fmt:check"]
+description = "Check Go formatting with gofumpt"
+run = '''
+files="$(gofumpt -extra -l .)"
+if [ -n "$files" ]; then
+  echo "$files"
+  exit 1
+fi
+'''
+
+[tasks."go:fmt:fix"]
+description = "Format Go code with gofumpt"
+run = "gofumpt -extra -l -w ."
+
+[tasks."go:lint"]
+description = "Lint Go source"
+run = '''
+if ! find . -name '*.go' -not -path './vendor/*' -print -quit | grep -q .; then
+  echo "No Go source files to lint"
+  exit 0
+fi
+golangci-lint run --config=.golangci.yml
+'''
+
+[tasks."go:lint:fix"]
+description = "Lint Go source and apply automatic fixes"
+run = '''
+if ! find . -name '*.go' -not -path './vendor/*' -print -quit | grep -q .; then
+  echo "No Go source files to lint"
+  exit 0
+fi
+golangci-lint run --config=.golangci.yml --fix
+'''
+
+[tasks."go:test"]
+description = "Run Go tests with coverage"
+run = '''
+if [ -z "$(go list ./... 2>/dev/null)" ]; then
+  echo "No Go packages to test"
+  exit 0
+fi
+go test -coverprofile=unit.coverprofile ./...
+'''
+
+[tasks."go:test:clean"]
+description = "Remove Go test and coverage artifacts"
+run = "rm -f *.out coverage.* *.coverprofile profile.cov junit.*"
