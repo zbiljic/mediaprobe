@@ -21,7 +21,7 @@ import (
 func TestProbeURLSRT(t *testing.T) {
 	t.Parallel()
 
-	serverURL, serverDone := newSRTTestServer(t, srtVideoMPEGTS(t))
+	serverURL, serverDone := newSRTTestServer(t, videoMPEGTSWithDTS(t))
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
@@ -47,7 +47,7 @@ func TestProbeURLSRT(t *testing.T) {
 func TestSRTPreservesMPEGTSPTSAndDTS(t *testing.T) {
 	t.Parallel()
 
-	serverURL, serverDone := newSRTTestServer(t, srtVideoMPEGTS(t))
+	serverURL, serverDone := newSRTTestServer(t, videoMPEGTSWithDTS(t))
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
@@ -270,7 +270,7 @@ func waitForSRTServer(t *testing.T, done <-chan error) {
 	}
 }
 
-func srtVideoMPEGTS(t *testing.T) []byte {
+func videoMPEGTSWithDTS(t *testing.T) []byte {
 	t.Helper()
 
 	var output bytes.Buffer

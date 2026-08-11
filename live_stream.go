@@ -45,6 +45,9 @@ func (s *liveStream) Tracks(ctx context.Context) ([]Track, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-s.ctx.Done():
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		return nil, io.EOF
 	}
 }
@@ -58,6 +61,9 @@ func (s *liveStream) ReadSample(ctx context.Context) (Sample, error) {
 	case <-ctx.Done():
 		return Sample{}, ctx.Err()
 	case <-s.ctx.Done():
+		if err := ctx.Err(); err != nil {
+			return Sample{}, err
+		}
 		return Sample{}, io.EOF
 	}
 }
