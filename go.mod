@@ -7,6 +7,7 @@ require (
 	github.com/bluenviron/gortmplib v1.0.0
 	github.com/bluenviron/gortsplib/v5 v5.6.3
 	github.com/bluenviron/mediacommon/v2 v2.9.2
+	github.com/datarhei/gosrt v0.11.0
 	github.com/pion/rtp v1.10.5
 )
 
@@ -14,6 +15,7 @@ require (
 	github.com/abema/go-mp4 v1.7.1 // indirect
 	github.com/asticode/go-astikit v0.30.0 // indirect
 	github.com/asticode/go-astits v1.15.0 // indirect
+	github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/pion/logging v0.2.4 // indirect
