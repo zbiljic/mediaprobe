@@ -11,4 +11,6 @@ var (
 	ErrInvalidObservationDuration = errors.New("mediaprobe: invalid observation duration")
 	ErrInvalidSampleLimit         = errors.New("mediaprobe: invalid sample limit")
 	ErrSampleLimitExceeded        = errors.New("mediaprobe: sample limit exceeded")
+	ErrInvalidURL                 = errors.New("mediaprobe: invalid URL")
+	ErrUnsupportedScheme          = errors.New("mediaprobe: unsupported URL scheme")
 )

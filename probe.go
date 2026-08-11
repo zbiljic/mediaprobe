@@ -33,7 +33,7 @@ type Stream interface {
 	ReadSample(context.Context) (Sample, error)
 }
 
-// Option configures ProbeStream.
+// Option configures ProbeStream and ProbeURL.
 type Option func(*probeOptions)
 
 // WithObservationDuration overrides DefaultObservationDuration. The duration
@@ -55,6 +55,7 @@ func WithSampleLimit(limit int) Option {
 type probeOptions struct {
 	observationDuration time.Duration
 	sampleLimit         int
+	http                httpOptions
 }
 
 // ProbeStream observes a stream until it covers the configured duration of
@@ -63,13 +64,14 @@ type probeOptions struct {
 // collected so far.
 func ProbeStream(ctx context.Context, stream Stream, options ...Option) (Report, error) {
 	config := applyOptions(options)
-	if config.observationDuration <= 0 {
-		return Report{}, ErrInvalidObservationDuration
-	}
-	if config.sampleLimit <= 0 {
-		return Report{}, ErrInvalidSampleLimit
+	if err := validateOptions(config); err != nil {
+		return Report{}, err
 	}
 
+	return probeStream(ctx, stream, config)
+}
+
+func probeStream(ctx context.Context, stream Stream, config probeOptions) (Report, error) {
 	if stream == nil {
 		return Report{}, fmt.Errorf("%w: nil stream", ErrNoTracks)
 	}
@@ -105,6 +107,17 @@ func ProbeStream(ctx context.Context, stream Stream, options ...Option) (Report,
 	}
 
 	return probe.report(), nil
+}
+
+func validateOptions(config probeOptions) error {
+	if config.observationDuration <= 0 {
+		return ErrInvalidObservationDuration
+	}
+	if config.sampleLimit <= 0 {
+		return ErrInvalidSampleLimit
+	}
+
+	return nil
 }
 
 func applyOptions(options []Option) probeOptions {

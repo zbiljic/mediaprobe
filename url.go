@@ -1,0 +1,77 @@
+package mediaprobe
+
+import (
+	"context"
+	"fmt"
+	"maps"
+	"net/http"
+	"net/url"
+	"strings"
+)
+
+type httpOptions struct {
+	client  *http.Client
+	headers map[string]string
+}
+
+// WithHTTPClient sets the client used for HTTP-based streams. ProbeURL does
+// not mutate the client. A nil client uses default HTTP settings.
+func WithHTTPClient(client *http.Client) Option {
+	return func(options *probeOptions) {
+		options.http.client = client
+	}
+}
+
+// WithHTTPHeaders adds headers to every request made for HTTP-based streams,
+// including cross-origin resources referenced by a playlist. The values are
+// copied when this option is created and whenever it is applied.
+func WithHTTPHeaders(headers map[string]string) Option {
+	copied := maps.Clone(headers)
+	return func(options *probeOptions) {
+		options.http.headers = maps.Clone(copied)
+	}
+}
+
+// ProbeURL connects to a live media URL and observes it for the configured
+// duration of media time. HTTP and HTTPS HLS URLs are currently supported.
+// Callers should provide a context with an appropriate wall-clock deadline.
+func ProbeURL(ctx context.Context, rawURL string, options ...Option) (Report, error) {
+	config := applyOptions(options)
+	if err := validateOptions(config); err != nil {
+		return Report{}, err
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return Report{}, ErrInvalidURL
+	}
+
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return Report{}, fmt.Errorf("%w: %s", ErrUnsupportedScheme, scheme)
+	}
+
+	stream, err := openHLS(ctx, rawURL, config)
+	if err != nil {
+		return Report{}, &protocolError{protocol: "HLS", err: err}
+	}
+	defer stream.Close()
+
+	return probeStream(ctx, stream, config)
+}
+
+// protocolError deliberately omits the wrapped error text because HTTP errors
+// can contain credentials or signed query parameters. Unwrap retains errors.Is
+// and errors.As behavior for callers that need the underlying cause.
+type protocolError struct {
+	protocol string
+	err      error
+}
+
+func (e *protocolError) Error() string {
+	return "mediaprobe: " + e.protocol + " client error"
+}
+
+func (e *protocolError) Unwrap() error {
+	return e.err
+}
