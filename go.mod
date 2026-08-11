@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/bluenviron/gohlslib/v2 v2.4.2
+	github.com/bluenviron/gortmplib v1.0.0
 	github.com/bluenviron/gortsplib/v5 v5.6.3
 	github.com/bluenviron/mediacommon/v2 v2.9.2
 	github.com/pion/rtp v1.10.5

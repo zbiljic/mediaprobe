@@ -33,7 +33,7 @@ func WithHTTPHeaders(headers map[string]string) Option {
 }
 
 // ProbeURL connects to a live media URL and observes it for the configured
-// duration of media time. HTTP(S) HLS and RTSP(S) URLs are currently
+// duration of media time. HTTP(S) HLS, RTSP(S), and RTMP(S) URLs are currently
 // supported. Callers should provide a context with an appropriate wall-clock
 // deadline.
 func ProbeURL(ctx context.Context, rawURL string, options ...Option) (Report, error) {
@@ -57,6 +57,9 @@ func ProbeURL(ctx context.Context, rawURL string, options ...Option) (Report, er
 	case "rtsp", "rtsps":
 		protocol = "RTSP"
 		stream, err = openRTSP(ctx, rawURL)
+	case "rtmp", "rtmps":
+		protocol = "RTMP"
+		stream, err = openRTMP(ctx, parsed)
 	default:
 		return Report{}, fmt.Errorf("%w: %s", ErrUnsupportedScheme, scheme)
 	}
