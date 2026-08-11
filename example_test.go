@@ -31,7 +31,8 @@ func ExampleProbeStream() {
 	track := report.Tracks[0]
 	normalizeInCaller := track.IsVariableFrameRate ||
 		track.NonMonotonicDTS > 0 ||
-		track.TimestampDiscontinuities > 0
+		track.TimestampDiscontinuities > 0 ||
+		(track.H264 != nil && track.H264.DTS.Error != nil)
 
 	fmt.Println("complete:", report.IsComplete)
 	fmt.Println("samples:", track.SampleCount)

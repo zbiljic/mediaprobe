@@ -94,51 +94,64 @@ func hlsTrackInfo(id int, track *gohlslib.Track) Track {
 }
 
 func setHLSCallback(client *gohlslib.Client, stream *liveStream, id int, track *gohlslib.Track) {
-	publish := func(pts, dts int64, size int) {
-		stream.publishSample(Sample{
+	publish := func(pts, dts int64, size int, configure func(*Sample)) {
+		sample := Sample{
 			TrackID: id,
 			PTS:     ticksToDuration(pts, track.ClockRate),
 			DTS:     ticksToDuration(dts, track.ClockRate),
 			Size:    size,
-		})
+		}
+		if configure != nil {
+			configure(&sample)
+		}
+		stream.publishSample(sample)
 	}
-	publishBuffers := func(pts, dts int64, buffers [][]byte) {
+	publishBuffers := func(pts, dts int64, buffers [][]byte, configure func(*Sample)) {
 		size, ok := buffersSize(buffers)
 		if !ok {
 			stream.fail(ErrInvalidSample)
 			return
 		}
-		publish(pts, dts, size)
+		publish(pts, dts, size, configure)
 	}
 
-	switch track.Codec.(type) {
+	switch codec := track.Codec.(type) {
 	case *codecs.AV1:
 		client.OnDataAV1(track, func(pts int64, units [][]byte) {
-			publishBuffers(pts, pts, units)
+			publishBuffers(pts, pts, units, nil)
 		})
 	case *codecs.VP9:
 		client.OnDataVP9(track, func(pts int64, frame []byte) {
-			publish(pts, pts, len(frame))
+			publish(pts, pts, len(frame), nil)
 		})
-	case *codecs.H265, *codecs.H264:
+	case *codecs.H265:
 		client.OnDataH26x(track, func(pts, dts int64, units [][]byte) {
-			publishBuffers(pts, dts, units)
+			publishBuffers(pts, dts, units, nil)
+		})
+	case *codecs.H264:
+		checker := newH264DTSChecker(track.ClockRate, codec.SPS, codec.PPS)
+		client.OnDataH26x(track, func(pts, dts int64, units [][]byte) {
+			check := checker.observe(pts, units)
+			publishBuffers(pts, dts, units, func(sample *Sample) {
+				sample.h264DTS = check
+				sample.h264DTSChecked = true
+			})
 		})
 	case *codecs.Opus:
 		client.OnDataOpus(track, func(pts int64, packets [][]byte) {
-			publishBuffers(pts, pts, packets)
+			publishBuffers(pts, pts, packets, nil)
 		})
 	case *codecs.FLAC:
 		client.OnDataFLAC(track, func(pts int64, frame []byte) {
-			publish(pts, pts, len(frame))
+			publish(pts, pts, len(frame), nil)
 		})
 	case *codecs.MPEG4Audio:
 		client.OnDataMPEG4Audio(track, func(pts int64, units [][]byte) {
-			publishBuffers(pts, pts, units)
+			publishBuffers(pts, pts, units, nil)
 		})
 	case *codecs.KLV:
 		client.OnDataKLV(track, func(pts int64, unit []byte) {
-			publish(pts, pts, len(unit))
+			publish(pts, pts, len(unit), nil)
 		})
 	}
 }

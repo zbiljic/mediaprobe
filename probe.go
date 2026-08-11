@@ -244,6 +244,11 @@ func analyzeTrack(track *trackSamples) TrackReport {
 		Track:       track.track,
 		SampleCount: len(track.samples),
 	}
+	for _, sample := range track.samples {
+		if sample.h264DTSChecked {
+			report.H264 = &H264Report{DTS: sample.h264DTS}
+		}
+	}
 	if len(track.samples) < 2 {
 		return report
 	}

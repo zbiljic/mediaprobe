@@ -184,6 +184,14 @@ func TestReportJSON(t *testing.T) {
 				},
 				ObservedFrameRate: 25,
 				Bitrate:           3_124_000,
+				H264: &mediaprobe.H264Report{DTS: mediaprobe.H264DTSReport{
+					Samples: 451,
+					Error: &mediaprobe.H264DTSError{
+						At:      22480 * time.Millisecond,
+						Code:    mediaprobe.H264DTSErrorTooManyReorderedFrames,
+						Message: "too many reordered frames (49)",
+					},
+				}},
 			},
 			{
 				Track: mediaprobe.Track{
@@ -211,7 +219,17 @@ func TestReportJSON(t *testing.T) {
 			"sample_count": 0,
 			"observed_duration": 0,
 			"fps": 25,
-			"bitrate": 3124000
+			"bitrate": 3124000,
+			"h264": {
+				"dts": {
+					"samples": 451,
+					"error": {
+						"at": 22480000000,
+						"code": "too_many_reordered_frames",
+						"message": "too many reordered frames (49)"
+					}
+				}
+			}
 		}, {
 			"id": 2,
 			"type": "audio",

@@ -92,4 +92,7 @@ type Sample struct {
 	Duration   time.Duration
 	IsKeyFrame bool
 	Size       int
+
+	h264DTS        H264DTSReport
+	h264DTSChecked bool
 }

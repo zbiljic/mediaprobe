@@ -55,6 +55,27 @@ func TestProbeURLHLS(t *testing.T) {
 	}
 }
 
+func TestProbeURLHLSChecksH264DTS(t *testing.T) {
+	t.Parallel()
+
+	server := newHLSVideoTestServer(t)
+	report, err := mediaprobe.ProbeURL(
+		t.Context(),
+		server.URL+"/index.m3u8",
+		mediaprobe.WithObservationDuration(60*time.Millisecond),
+	)
+	requireNoError(t, err)
+	requireEqual(t, len(report.Tracks), 1)
+	requireEqual(t, report.Tracks[0].Codec, mediaprobe.CodecH264)
+	if report.Tracks[0].H264 == nil {
+		t.Fatal("H264 report is nil")
+	}
+	requireEqual(t, report.Tracks[0].H264.DTS.Samples >= 2, true)
+	if report.Tracks[0].H264.DTS.Error != nil {
+		t.Fatalf("H264 DTS error = %+v", report.Tracks[0].H264.DTS.Error)
+	}
+}
+
 func TestProbeURLReturnsIncompleteHLSReport(t *testing.T) {
 	t.Parallel()
 
@@ -226,6 +247,32 @@ func newHLSTestServer(t *testing.T, requiredHeaders map[string]string) *httptest
 	return server
 }
 
+func newHLSVideoTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	segment := videoMPEGTS(t)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/index.m3u8":
+			writer.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+			_, _ = writer.Write([]byte("#EXTM3U\n" +
+				"#EXT-X-VERSION:3\n" +
+				"#EXT-X-TARGETDURATION:1\n" +
+				"#EXT-X-PLAYLIST-TYPE:VOD\n" +
+				"#EXTINF:1,\n" +
+				"segment.ts\n" +
+				"#EXT-X-ENDLIST\n"))
+		case "/segment.ts":
+			writer.Header().Set("Content-Type", "video/MP2T")
+			_, _ = writer.Write(segment)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
 func audioMPEGTS(t *testing.T) []byte {
 	t.Helper()
 
@@ -242,6 +289,35 @@ func audioMPEGTS(t *testing.T) []byte {
 	}
 
 	return output.Bytes()
+}
+
+func videoMPEGTS(t *testing.T) []byte {
+	t.Helper()
+
+	var output bytes.Buffer
+	track := &mpegts.Track{Codec: &mpegtscodecs.H264{}}
+	writer := &mpegts.Writer{W: &output, Tracks: []*mpegts.Track{track}}
+	requireNoError(t, writer.Initialize())
+	requireNoError(t, writer.WriteH264(track, 0, 0, h264FirstAccessUnit))
+	requireNoError(t, writer.WriteH264(track, 3_000, 3_000, [][]byte{{
+		0x41, 0x9a, 0x21, 0x6c, 0x45, 0xff,
+	}}))
+	requireNoError(t, writer.WriteH264(track, 6_000, 6_000, [][]byte{{
+		0x41, 0x9a, 0x42, 0x3c, 0x21, 0x93,
+	}}))
+
+	return output.Bytes()
+}
+
+var h264FirstAccessUnit = [][]byte{
+	{
+		0x67, 0x64, 0x00, 0x28, 0xac, 0xd9, 0x40, 0x78,
+		0x02, 0x27, 0xe5, 0x84, 0x00, 0x00, 0x03, 0x00,
+		0x04, 0x00, 0x00, 0x03, 0x00, 0xf0, 0x3c, 0x60,
+		0xc6, 0x58,
+	},
+	{0x68, 0xce, 0x3c, 0x80},
+	{0x65, 0x88, 0x84, 0x00, 0x33, 0xff},
 }
 
 type headerTransport struct {
