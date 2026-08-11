@@ -33,8 +33,9 @@ func WithHTTPHeaders(headers map[string]string) Option {
 }
 
 // ProbeURL connects to a live media URL and observes it for the configured
-// duration of media time. HTTP and HTTPS HLS URLs are currently supported.
-// Callers should provide a context with an appropriate wall-clock deadline.
+// duration of media time. HTTP(S) HLS and RTSP(S) URLs are currently
+// supported. Callers should provide a context with an appropriate wall-clock
+// deadline.
 func ProbeURL(ctx context.Context, rawURL string, options ...Option) (Report, error) {
 	config := applyOptions(options)
 	if err := validateOptions(config); err != nil {
@@ -47,22 +48,31 @@ func ProbeURL(ctx context.Context, rawURL string, options ...Option) (Report, er
 	}
 
 	scheme := strings.ToLower(parsed.Scheme)
-	if scheme != "http" && scheme != "https" {
+	var stream *liveStream
+	var protocol string
+	switch scheme {
+	case "http", "https":
+		protocol = "HLS"
+		stream, err = openHLS(ctx, rawURL, config)
+	case "rtsp", "rtsps":
+		protocol = "RTSP"
+		stream, err = openRTSP(ctx, rawURL)
+	default:
 		return Report{}, fmt.Errorf("%w: %s", ErrUnsupportedScheme, scheme)
 	}
 
-	stream, err := openHLS(ctx, rawURL, config)
 	if err != nil {
-		return Report{}, &protocolError{protocol: "HLS", err: err}
+		return Report{}, &protocolError{protocol: protocol, err: err}
 	}
 	defer stream.Close()
 
 	return probeStream(ctx, stream, config)
 }
 
-// protocolError deliberately omits the wrapped error text because HTTP errors
-// can contain credentials or signed query parameters. Unwrap retains errors.Is
-// and errors.As behavior for callers that need the underlying cause.
+// protocolError deliberately omits the wrapped error text because protocol
+// errors can contain credentials, hosts, or signed query parameters. Unwrap
+// retains errors.Is and errors.As behavior for callers that need the
+// underlying cause.
 type protocolError struct {
 	protocol string
 	err      error
