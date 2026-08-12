@@ -253,23 +253,30 @@ func analyzeTrack(track *trackSamples) TrackReport {
 		return report
 	}
 
+	minimumDTS, maximumDTS := track.samples[0].DTS, track.samples[0].DTS
+	for _, sample := range track.samples[1:] {
+		minimumDTS = min(minimumDTS, sample.DTS)
+		maximumDTS = max(maximumDTS, sample.DTS)
+	}
+	report.ObservedDTSSpan = maximumDTS - minimumDTS
+
 	pts := make([]time.Duration, 0, len(track.samples))
 	for _, sample := range track.samples {
 		pts = append(pts, sample.PTS)
 	}
 	slices.Sort(pts)
 
-	report.ObservedDuration = pts[len(pts)-1] - pts[0]
-	if report.ObservedDuration > 0 {
-		bitrate := float64(track.totalBytes) * 8 / report.ObservedDuration.Seconds()
+	report.ObservedPTSSpan = pts[len(pts)-1] - pts[0]
+	if report.ObservedPTSSpan > 0 {
+		bitrate := float64(track.totalBytes) * 8 / report.ObservedPTSSpan.Seconds()
 		if bitrate >= float64(^uint64(0)) {
 			report.Bitrate = ^uint64(0)
 		} else {
 			report.Bitrate = uint64(bitrate)
 		}
 	}
-	if report.ObservedDuration > 0 && track.track.MediaType == MediaTypeVideo {
-		report.ObservedFrameRate = float64(len(pts)-1) / report.ObservedDuration.Seconds()
+	if report.ObservedPTSSpan > 0 && track.track.MediaType == MediaTypeVideo {
+		report.ObservedFrameRate = float64(len(pts)-1) / report.ObservedPTSSpan.Seconds()
 	}
 
 	intervals := positiveIntervals(pts)

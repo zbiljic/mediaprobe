@@ -43,9 +43,10 @@ func TestProbeStream(t *testing.T) {
 	requireEqual(t, report.IsComplete, true)
 	requireEqual(t, report.ObservationDuration, mediaprobe.DefaultObservationDuration)
 	requireEqual(t, len(report.Tracks), 1)
+	requireEqual(t, report.Tracks[0].ObservedDTSSpan, report.Tracks[0].ObservedPTSSpan)
 	requireNear(t, report.Tracks[0].ObservedFrameRate, 30_000.0/1_001.0, 0.01)
 	expectedBitrate := uint64(
-		float64(len(stream.samples)*1_000*8) / report.Tracks[0].ObservedDuration.Seconds(),
+		float64(len(stream.samples)*1_000*8) / report.Tracks[0].ObservedPTSSpan.Seconds(),
 	)
 	requireEqual(t, report.Tracks[0].Bitrate, expectedBitrate)
 	requireEqual(t, report.Tracks[0].IsVariableFrameRate, false)
@@ -176,14 +177,25 @@ func TestReportJSON(t *testing.T) {
 		Tracks: []mediaprobe.TrackReport{
 			{
 				Track: mediaprobe.Track{
-					ID:        1,
-					MediaType: mediaprobe.MediaTypeVideo,
-					Codec:     mediaprobe.CodecH264,
-					Width:     1920,
-					Height:    1080,
+					ID:                1,
+					MediaType:         mediaprobe.MediaTypeVideo,
+					Codec:             mediaprobe.CodecH264,
+					ClockRate:         90_000,
+					Width:             1920,
+					Height:            1080,
+					DeclaredFrameRate: mediaprobe.Rate{Numerator: 25, Denominator: 1},
 				},
-				ObservedFrameRate: 25,
-				Bitrate:           3_124_000,
+				SampleCount:               451,
+				ObservedPTSSpan:           15 * time.Second,
+				ObservedDTSSpan:           15 * time.Second,
+				ObservedFrameRate:         25,
+				Bitrate:                   3_124_000,
+				NominalFrameDuration:      40 * time.Millisecond,
+				MaxFrameDurationDeviation: time.Millisecond,
+				IrregularFrameIntervals:   2,
+				NonMonotonicDTS:           1,
+				TimestampDiscontinuities:  3,
+				IsVariableFrameRate:       true,
 				H264: &mediaprobe.H264Report{DTS: mediaprobe.H264DTSReport{
 					Samples: 451,
 					Error: &mediaprobe.H264DTSError{
@@ -201,6 +213,9 @@ func TestReportJSON(t *testing.T) {
 					SampleRate: 48_000,
 					Channels:   2,
 				},
+				SampleCount:     704,
+				ObservedPTSSpan: 15 * time.Second,
+				ObservedDTSSpan: 15 * time.Second,
 			},
 		},
 		ObservationDuration: mediaprobe.DefaultObservationDuration,
@@ -210,23 +225,47 @@ func TestReportJSON(t *testing.T) {
 	encoded, err := json.Marshal(report)
 	requireNoError(t, err)
 	requireJSONEqual(t, string(encoded), `{
+		"schema_version": "0.1",
+		"observation": {
+			"duration_ns": 15000000000,
+			"complete": true
+		},
 		"tracks": [{
 			"id": 1,
 			"type": "video",
 			"codec": "h264",
-			"width": 1920,
-			"height": 1080,
-			"sample_count": 0,
-			"observed_duration": 0,
-			"fps": 25,
-			"bitrate": 3124000,
+			"clock_rate_hz": 90000,
+			"video": {
+				"width": 1920,
+				"height": 1080,
+				"frame_rate": {
+					"numerator": 25,
+					"denominator": 1
+				}
+			},
+			"measurements": {
+				"sample_count": 451,
+				"pts_span_ns": 15000000000,
+				"dts_span_ns": 15000000000,
+				"average_bit_rate_bps": 3124000,
+				"average_frame_rate": 25,
+				"nominal_frame_duration_ns": 40000000,
+				"max_frame_duration_deviation_ns": 1000000,
+				"irregular_frame_interval_count": 2,
+				"non_monotonic_dts_count": 1,
+				"timestamp_discontinuity_count": 3,
+				"variable_frame_rate": true
+			},
 			"h264": {
 				"dts": {
-					"samples": 451,
+					"samples_examined": 451,
 					"error": {
-						"at": 22480000000,
 						"code": "too_many_reordered_frames",
-						"message": "too many reordered frames (49)"
+						"message": "too many reordered frames (49)",
+						"details": [{
+							"type": "media_location",
+							"time_offset_ns": 22480000000
+						}]
 					}
 				}
 			}
@@ -234,14 +273,68 @@ func TestReportJSON(t *testing.T) {
 			"id": 2,
 			"type": "audio",
 			"codec": "aac",
-			"sample_rate": 48000,
-			"channels": 2,
-			"sample_count": 0,
-			"observed_duration": 0
-		}],
-		"observation_duration": 15000000000,
-		"complete": true
+			"audio": {
+				"sample_rate_hz": 48000,
+				"channels": 2
+			},
+			"measurements": {
+				"sample_count": 704,
+				"pts_span_ns": 15000000000,
+				"dts_span_ns": 15000000000
+			}
+		}]
 	}`)
+}
+
+func TestPartialReportJSON(t *testing.T) {
+	t.Parallel()
+
+	encoded, err := json.Marshal(mediaprobe.Report{
+		ObservationDuration: 2 * time.Second,
+	})
+	requireNoError(t, err)
+	requireJSONEqual(t, string(encoded), `{
+		"schema_version": "0.1",
+		"observation": {
+			"duration_ns": 2000000000,
+			"complete": false
+		},
+		"tracks": []
+	}`)
+}
+
+func TestReportJSONPreservesZeroErrorOffset(t *testing.T) {
+	t.Parallel()
+
+	encoded, err := json.Marshal(mediaprobe.Report{Tracks: []mediaprobe.TrackReport{{
+		Track: mediaprobe.Track{ID: 1, MediaType: mediaprobe.MediaTypeVideo, Codec: mediaprobe.CodecH264},
+		H264: &mediaprobe.H264Report{DTS: mediaprobe.H264DTSReport{
+			Samples: 1,
+			Error: &mediaprobe.H264DTSError{
+				Code:    mediaprobe.H264DTSErrorMissingSPS,
+				Message: "SPS not received yet",
+			},
+		}},
+	}}})
+	requireNoError(t, err)
+
+	var report struct {
+		Tracks []struct {
+			H264 struct {
+				DTS struct {
+					Error struct {
+						Details []struct {
+							TimeOffsetNS *int64 `json:"time_offset_ns"`
+						} `json:"details"`
+					} `json:"error"`
+				} `json:"dts"`
+			} `json:"h264"`
+		} `json:"tracks"`
+	}
+	requireNoError(t, json.Unmarshal(encoded, &report))
+	if offset := report.Tracks[0].H264.DTS.Error.Details[0].TimeOffsetNS; offset == nil || *offset != 0 {
+		t.Fatalf("time_offset_ns = %v, want pointer to zero", offset)
+	}
 }
 
 func TestProbeDetectsTimingProblems(t *testing.T) {
@@ -346,7 +439,7 @@ func TestProbeReturnsPartialReport(t *testing.T) {
 	report, err := mediaprobe.ProbeStream(t.Context(), stream)
 	requireErrorIs(t, err, mediaprobe.ErrObservationIncomplete)
 	requireEqual(t, report.IsComplete, false)
-	requireEqual(t, report.Tracks[0].ObservedDuration, 10*time.Second)
+	requireEqual(t, report.Tracks[0].ObservedPTSSpan, 10*time.Second)
 }
 
 func TestProbeStopsAtSampleLimit(t *testing.T) {
