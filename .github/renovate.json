@@ -31,6 +31,12 @@
       "description": ["Update Go dependencies"],
       "matchManagers": ["gomod"],
       "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"]
+    },
+    {
+      "description": ["Keep RTP on v1 while gortsplib APIs require v1 packets"],
+      "matchManagers": ["gomod"],
+      "matchPackageNames": ["github.com/pion/rtp"],
+      "allowedVersions": "<2.0.0"
     }
   ]
 }
