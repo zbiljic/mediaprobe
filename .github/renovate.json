@@ -9,6 +9,12 @@
   "enabledManagers": ["custom.regex", "github-actions", "gomod", "mise"],
   "packageRules": [
     {
+      "description": ["Keep RTP on v1 while gortsplib APIs require v1 packets"],
+      "matchManagers": ["gomod"],
+      "matchPackageNames": ["github.com/pion/rtp"],
+      "allowedVersions": "<2.0.0"
+    },
+    {
       "description": ["Automerge non-major updates"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "automerge": true,
