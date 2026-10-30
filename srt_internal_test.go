@@ -216,6 +216,64 @@ func TestMPEGTSTrackInfo(t *testing.T) {
 	}
 }
 
+func TestMPEGTSMPEGVideoSamples(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		codec     codecs.Codec
+		wantCodec Codec
+		write     func(*mpegts.Writer, *mpegts.Track, int64, []byte) error
+	}{
+		{
+			name: "MPEG-4 video", codec: &codecs.MPEG4Video{}, wantCodec: CodecMPEG4Video,
+			write: (*mpegts.Writer).WriteMPEG4Video,
+		},
+		{
+			name: "MPEG-1/2 video", codec: &codecs.MPEG1Video{}, wantCodec: CodecMPEG1Video,
+			write: (*mpegts.Writer).WriteMPEG1Video,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			var output bytes.Buffer
+			track := &mpegts.Track{Codec: test.codec}
+			writer := &mpegts.Writer{W: &output, Tracks: []*mpegts.Track{track}}
+			if err := writer.Initialize(); err != nil {
+				t.Fatalf("initialize MPEG-TS writer: %v", err)
+			}
+			frame := []byte{0, 0, 1, 0xb8, 1, 2, 3, 4}
+			if err := test.write(writer, track, 9_000, frame); err != nil {
+				t.Fatalf("write MPEG-TS video: %v", err)
+			}
+
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			stream := newLiveStream(ctx)
+			t.Cleanup(stream.Close)
+			go runMPEGTSReader(stream, bytes.NewReader(output.Bytes()), "MPEG-TS")
+
+			tracks, err := stream.Tracks(ctx)
+			if err != nil {
+				t.Fatalf("Tracks() error = %v", err)
+			}
+			if len(tracks) != 1 || tracks[0].Codec != test.wantCodec {
+				t.Fatalf("tracks = %+v", tracks)
+			}
+			sample, err := stream.ReadSample(ctx)
+			if err != nil {
+				t.Fatalf("ReadSample() error = %v", err)
+			}
+			if sample.TrackID != tracks[0].ID || sample.PTS != 100*time.Millisecond ||
+				sample.DTS != sample.PTS || sample.Size != len(frame) {
+				t.Fatalf("sample = %+v", sample)
+			}
+		})
+	}
+}
+
 func newSRTTestServer(t *testing.T, payload []byte) (string, <-chan error) {
 	t.Helper()
 

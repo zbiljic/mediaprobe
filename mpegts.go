@@ -113,8 +113,12 @@ func setMPEGTSCallback(reader *mpegts.Reader, stream *liveStream, id int, track 
 				sample.h264DTSChecked = true
 			})
 		})
-	case *codecs.MPEG4Video, *codecs.MPEG1Video:
-		reader.OnDataMPEGxVideo(track, func(pts int64, frame []byte) error {
+	case *codecs.MPEG4Video:
+		reader.OnDataMPEG4Video(track, func(pts int64, frame []byte) error {
+			return publish(pts, pts, len(frame), nil)
+		})
+	case *codecs.MPEG1Video:
+		reader.OnDataMPEG1Video(track, func(pts int64, frame []byte) error {
 			return publish(pts, pts, len(frame), nil)
 		})
 	case *codecs.Opus:
