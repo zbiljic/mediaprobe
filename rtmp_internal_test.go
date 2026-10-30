@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -317,7 +318,7 @@ func newRTMPTestServer(t *testing.T) (string, <-chan error) {
 			done <- fmt.Errorf("initialize RTMP server connection: %w", err)
 			return
 		}
-		if err := serverConnection.Accept(); err != nil {
+		if err := serverConnection.AcceptConn(); err != nil {
 			done <- fmt.Errorf("accept RTMP session: %w", err)
 			return
 		}
@@ -348,18 +349,17 @@ func newRTMPTestServer(t *testing.T) (string, <-chan error) {
 			dts := 50*time.Millisecond + time.Duration(index)*33*time.Millisecond
 			pts := dts + 50*time.Millisecond
 			if err := writer.WriteH264(track, pts, dts, frames[min(index, len(frames)-1)]); err != nil {
+				// The probe can finish before the server has sent every frame.
+				if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+					break
+				}
 				done <- fmt.Errorf("write RTMP H264: %w", err)
 				return
 			}
 		}
 
-		buffer := make([]byte, 1024)
-		for {
-			if _, err := connection.Read(buffer); err != nil {
-				done <- nil
-				return
-			}
-		}
+		_ = writer.Wait()
+		done <- nil
 	}()
 
 	return "rtmp://" + listener.Addr().String() + "/live#stream", done
