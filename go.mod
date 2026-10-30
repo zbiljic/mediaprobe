@@ -8,7 +8,7 @@ require (
 	github.com/bluenviron/gortsplib/v5 v5.6.3
 	github.com/bluenviron/mediacommon/v2 v2.9.2
 	github.com/datarhei/gosrt v0.13.0
-	github.com/pion/rtp v1.10.5
+	github.com/pion/rtp v1.10.6
 )
 
 require (
