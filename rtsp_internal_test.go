@@ -7,7 +7,7 @@ import (
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/gortsplib/v5/pkg/format"
 	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg4audio"
-	"github.com/pion/rtp"
+	"github.com/pion/rtp/v2"
 )
 
 func TestRTSPTrackInfo(t *testing.T) {
