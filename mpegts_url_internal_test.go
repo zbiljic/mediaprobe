@@ -262,14 +262,11 @@ func newUDPMPEGTSTestSender(t *testing.T, payload []byte) (string, <-chan error)
 
 	done := make(chan error, 1)
 	go func() {
-		const payloadSize = 7 * 188
 		for attempt := 0; attempt < 20; attempt++ {
-			for offset := 0; offset < len(payload); offset += payloadSize {
-				end := min(offset+payloadSize, len(payload))
-				if _, writeErr := sender.WriteToUDP(payload[offset:end], address); writeErr != nil {
-					done <- fmt.Errorf("write UDP MPEG-TS: %w", writeErr)
-					return
-				}
+			// Keep the opening keyframe with the tables if the receiver misses an earlier send.
+			if _, writeErr := sender.WriteToUDP(payload, address); writeErr != nil {
+				done <- fmt.Errorf("write UDP MPEG-TS: %w", writeErr)
+				return
 			}
 			time.Sleep(10 * time.Millisecond)
 		}

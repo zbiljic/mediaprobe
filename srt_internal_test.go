@@ -344,7 +344,8 @@ func videoMPEGTSWithDTS(t *testing.T) []byte {
 		{{0x41, 0x9a, 0x42, 0x3c, 0x21, 0x93}},
 		{{0x41, 0x9a, 0x63, 0x49, 0xe1, 0x0f}},
 	}
-	for index := 0; index < 64; index++ {
+	// Cover the observation window while fitting in one UDP datagram.
+	for index := 0; index < 8; index++ {
 		dts := int64(4_500 + index*3_000)
 		pts := dts + 4_500
 		if err := writer.WriteH264(track, pts, dts, frames[min(index, len(frames)-1)]); err != nil {
