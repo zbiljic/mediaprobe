@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/bluenviron/gohlslib/v2 v2.4.8
-	github.com/bluenviron/gortmplib v1.0.5
+	github.com/bluenviron/gortmplib v1.0.6
 	github.com/bluenviron/gortsplib/v5 v5.6.7
 	github.com/bluenviron/mediacommon/v2 v2.10.0
 	github.com/datarhei/gosrt v0.13.0
